@@ -1,0 +1,65 @@
+{
+  "name": "clockboard",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "An array of analog clocks that move together to form patterns and display the time. React, SVG-rendered, 60fps.",
+  "author": "Jeffrey Yang",
+  "keywords": [
+    "react",
+    "clock",
+    "animation",
+    "svg",
+    "kinetic",
+    "art",
+    "analog",
+    "decorative",
+    "waapi",
+    "component"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeffreyyang/clockboard"
+  },
+  "homepage": "https://github.com/jeffreyyang/clockboard#readme",
+  "bugs": {
+    "url": "https://github.com/jeffreyyang/clockboard/issues"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
