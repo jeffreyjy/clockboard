@@ -18,11 +18,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/jeffreyyang/clockboard"
+    "url": "https://github.com/jeffreyjy/clockboard"
   },
-  "homepage": "https://github.com/jeffreyyang/clockboard#readme",
+  "homepage": "https://github.com/jeffreyjy/clockboard#readme",
   "bugs": {
-    "url": "https://github.com/jeffreyyang/clockboard/issues"
+    "url": "https://github.com/jeffreyjy/clockboard/issues"
   },
   "license": "MIT",
   "sideEffects": false,
