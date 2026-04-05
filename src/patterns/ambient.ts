@@ -49,12 +49,6 @@ export const VORTEX: GridPattern = grid((r, c) => {
   return [angle, angle + 180]
 })
 
-/** Hands tangential to the radial direction — pinwheel */
-export const PINWHEEL: GridPattern = grid((r, c) => {
-  const base = Math.atan2(c - CX, r - CY) * (180 / Math.PI) + 90
-  return [base + 45, base - 45]
-})
-
 /** Angle grows with distance from center — concentric rings */
 export const RINGS: GridPattern = grid((r, c) => {
   const dist  = Math.sqrt((c - CX) ** 2 + (r - CY) ** 2)
@@ -115,6 +109,6 @@ export const WINDMILL: GridPattern = grid((r, c) => {
 
 export const ALL_PATTERNS: GridPattern[] = [
   NOON, RADIAL, CONVERGE, CHECKERBOARD, WAVE, VORTEX,
-  PINWHEEL, RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
+  RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
   BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL,
 ]

@@ -1,13 +1,58 @@
 import { CYCLE_HOLD, DEFAULT_DURATION } from '../config'
-import { ALL_PATTERNS } from '../patterns/ambient'
+import { ALL_PATTERNS, NOON } from '../patterns/ambient'
 import { composeTime } from '../patterns/time'
-import { cycle, random } from './cycle'
+import type { CycleRandomOptions } from './cycle'
 import type { Behavior, GridPattern } from '../types'
 
 const TIME_DURATION = 5000
 const TIME_HOLD = 10000
 
-export function clock(duration = DEFAULT_DURATION): Behavior {
+/** Optional overrides for `clock` — omit keys for defaults. */
+export type ClockOptions = { duration?: number }
+
+/** Ambient timing (`CycleRandomOptions`) plus time-display segment for `clockRandom` / `clockCycle`. */
+export type ClockShowcaseOptions = CycleRandomOptions & {
+  timeDuration?: number
+  timeHold?: number
+}
+
+function resolveClockShowcaseArgs(
+  first?: GridPattern[] | ClockShowcaseOptions,
+  duration?: number,
+  hold?: number,
+  timeDuration?: number,
+  timeHold?: number,
+): {
+  patterns: GridPattern[]
+  duration: number
+  hold: number
+  timeDuration: number
+  timeHold: number
+} {
+  if (first !== undefined && !Array.isArray(first)) {
+    const o = first
+    return {
+      patterns: o.patterns ?? ALL_PATTERNS,
+      duration: o.duration ?? DEFAULT_DURATION,
+      hold: o.hold ?? CYCLE_HOLD,
+      timeDuration: o.timeDuration ?? TIME_DURATION,
+      timeHold: o.timeHold ?? TIME_HOLD,
+    }
+  }
+  return {
+    patterns: (first as GridPattern[] | undefined) ?? ALL_PATTERNS,
+    duration: duration ?? DEFAULT_DURATION,
+    hold: hold ?? CYCLE_HOLD,
+    timeDuration: timeDuration ?? TIME_DURATION,
+    timeHold: timeHold ?? TIME_HOLD,
+  }
+}
+
+export function clock(durationOrOptions?: number | ClockOptions): Behavior {
+  const duration =
+    typeof durationOrOptions === 'number'
+      ? durationOrOptions
+      : (durationOrOptions?.duration ?? DEFAULT_DURATION)
   return (apply) => {
     function show() {
       const now = new Date()
@@ -34,69 +79,79 @@ export function clock(duration = DEFAULT_DURATION): Behavior {
   }
 }
 
+// Single flat loop: show time whenever the minute changes, otherwise play the next
+// ambient pattern. One timer, no nested behaviors, no coordination across closures.
 function showcase(
-  ambientBehavior: Behavior,
-  timeDuration = TIME_DURATION,
-  timeHold = TIME_HOLD,
+  getNextPattern: () => GridPattern,
+  duration: number,
+  hold: number,
+  timeDuration: number,
+  timeHold: number,
 ): Behavior {
   return (apply) => {
-    let minuteTimer: ReturnType<typeof setTimeout>
-    let resumeTimer: ReturnType<typeof setTimeout>
-    let ambientCleanup: (() => void) | undefined
+    let timer: ReturnType<typeof setTimeout>
+    let lastMinute = -1
+    let cancelled = false
 
-    function showTime() {
-      clearTimeout(resumeTimer)
-
-      if (ambientCleanup) {
-        ambientCleanup()
-        ambientCleanup = undefined
+    function step() {
+      if (cancelled) return
+      const now = new Date()
+      const currentMinute = now.getMinutes()
+      if (currentMinute !== lastMinute) {
+        lastMinute = currentMinute
+        apply(composeTime(now.getHours(), now.getMinutes()), timeDuration)
+        timer = setTimeout(step, timeDuration + timeHold)
+      } else {
+        apply(getNextPattern(), duration)
+        timer = setTimeout(step, duration + hold)
       }
-
-      const now = new Date()
-      apply(composeTime(now.getHours(), now.getMinutes()), timeDuration)
-
-      resumeTimer = setTimeout(() => {
-        ambientCleanup = ambientBehavior(apply)
-      }, timeDuration + timeHold)
     }
 
-    function scheduleMinute() {
-      const now = new Date()
-      const ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
-
-      minuteTimer = setTimeout(() => {
-        showTime()
-        scheduleMinute()
-      }, ms)
-    }
-
-    showTime()
-    scheduleMinute()
-
-    return () => {
-      clearTimeout(minuteTimer)
-      clearTimeout(resumeTimer)
-      if (ambientCleanup) ambientCleanup()
-    }
+    step()
+    return () => { cancelled = true; clearTimeout(timer) }
   }
 }
 
 export function clockRandom(
-  patterns: GridPattern[] = ALL_PATTERNS,
-  duration = DEFAULT_DURATION,
-  hold = CYCLE_HOLD,
-  timeDuration = TIME_DURATION,
-  timeHold = TIME_HOLD,
+  first?: GridPattern[] | ClockShowcaseOptions,
+  duration?: number,
+  hold?: number,
+  timeDuration?: number,
+  timeHold?: number,
 ): Behavior {
-  return showcase(random(patterns, duration, hold), timeDuration, timeHold)
+  const a = resolveClockShowcaseArgs(first, duration, hold, timeDuration, timeHold)
+
+  let current = -1
+  const getNext = (): GridPattern => {
+    let next: number
+    do {
+      next = Math.floor(Math.random() * a.patterns.length)
+    } while (
+      (next === current || (current === -1 && a.patterns[next] === NOON)) &&
+      a.patterns.length > 1
+    )
+    current = next
+    return a.patterns[current]
+  }
+
+  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold)
 }
 
 export function clockCycle(
-  patterns: GridPattern[] = ALL_PATTERNS,
-  duration = DEFAULT_DURATION,
-  hold = CYCLE_HOLD,
-  timeDuration = TIME_DURATION,
-  timeHold = TIME_HOLD,
+  first?: GridPattern[] | ClockShowcaseOptions,
+  duration?: number,
+  hold?: number,
+  timeDuration?: number,
+  timeHold?: number,
 ): Behavior {
-  return showcase(cycle(patterns, duration, hold), timeDuration, timeHold)
+  const a = resolveClockShowcaseArgs(first, duration, hold, timeDuration, timeHold)
+
+  let index = a.patterns[0] === NOON ? 1 % a.patterns.length : 0
+  const getNext = (): GridPattern => {
+    const p = a.patterns[index]
+    index = (index + 1) % a.patterns.length
+    return p
+  }
+
+  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold)
 }

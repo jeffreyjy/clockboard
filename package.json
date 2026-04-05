@@ -1,19 +1,18 @@
 {
   "name": "clockboard",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
-  "description": "An array of analog clocks that move together to form patterns and display the time. React, SVG-rendered, 60fps.",
+  "description": "An array of analog clocks that move together to form patterns and display the time. Canvas-rendered React component, 60fps.",
   "author": "Jeffrey Yang",
   "keywords": [
     "react",
     "clock",
     "animation",
-    "svg",
+    "canvas",
     "kinetic",
     "art",
     "analog",
     "decorative",
-    "waapi",
     "component"
   ],
   "repository": {
@@ -57,7 +56,6 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
-    "react": "^19.2.4",
     "tsup": "^8.5.1",
     "typescript": "^6.0.2"
   },

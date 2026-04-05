@@ -1,6 +1,6 @@
 # ClockBoard
 
-An array of analog clocks that move together to form patterns, display the time, and transition through mesmerizing animations. A React component — canvas-free, SVG-rendered, 60fps via the Web Animations API, zero CSS imports.
+A 20×8 grid of analog clocks that animate together to form patterns and display the time. Canvas-rendered React component — 60fps, zero CSS imports.
 
 ## Install
 
@@ -24,18 +24,9 @@ function App() {
 }
 ```
 
-Drop it in and it works. The default behavior (`clockRandom`) displays the current time at each minute boundary, then transitions through randomized ambient patterns between updates.
+The default behavior (`clockRandom`) cycles through randomized ambient patterns, displaying the current time whenever the minute changes.
 
-The component fills the width of its parent container. The board background extends to fill the full parent dimensions (set `height` via the `style` prop or the parent element), while the clock grid maintains its fixed 20×8 aspect ratio centered within.
-
-## How It Works
-
-ClockBoard renders a 20×8 grid of 160 individual analog clocks. Each clock is an SVG with two hands that can independently rotate to any angle. By coordinating the hand positions across all 160 clocks, the board forms patterns, spells digits, and creates animations.
-
-- **Web Animations API (WAAPI)** drives all hand rotation — animations run on the compositor thread for smooth 60fps performance with zero React re-renders during transitions
-- **Shortest-path rotation** — hands always take the shortest angular path to their target, with cumulative angle tracking to preserve rotation direction
-- **SVG rendering** — each clock is a lightweight `<svg>` element with two `<rect>` hands and a center hub, no canvas or external rendering libraries
-- **CSS Grid layout** — the 20×8 grid uses native CSS Grid with percentage-based gaps for responsive scaling
+The board fills its parent. The clock grid keeps a fixed 20×8 aspect ratio and scales uniformly to fit the padded area — constrained by whichever dimension is tighter.
 
 ## Props
 
@@ -44,8 +35,8 @@ ClockBoard renders a 20×8 grid of 160 individual analog clocks. Each clock is a
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `behavior` | `Behavior` | `clockRandom()` | Dynamic behavior controlling pattern transitions over time |
-| `pattern` | `GridPattern` | — | Static pattern override — sets all clocks to a fixed position (disables `behavior`) |
-| `duration` | `number` | `5000` | Transition duration in ms when using the `pattern` prop |
+| `pattern` | `GridPattern` | — | Static pattern — sets all clocks to a fixed position (disables `behavior`) |
+| `duration` | `number` | `10000` | Transition duration in ms when using the `pattern` prop |
 
 When `pattern` is set, it takes priority over `behavior`. The board animates to the given pattern once and holds. When `pattern` is cleared (set to `undefined`), the `behavior` resumes.
 
@@ -53,24 +44,19 @@ When `pattern` is set, it takes priority over `behavior`. The board animates to 
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `handColor` | `string` | `'white'` | Color of the clock hands |
+| `handColor` | `string` | `'rgb(222, 222, 222)'` | Color of the clock hands |
 | `faceColor` | `string` | `'#141414'` | Background color of each clock face |
-| `boardColor` | `string` | `'#171717'` | Background color of the board container |
+| `boardColor` | `string` | `'#171717'` | Background of the board container — any CSS `background` value, including gradients |
 | `boardPadding` | `string` | `'4%'` | Padding around the clock grid |
 | `boardRadius` | `number` | `8` | Border radius of the board in pixels |
-| `clockGap` | `string` | `'0.25%'` | Gap between individual clocks |
-
-**Layout**
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
+| `clockGap` | `string` | `'0.5%'` | Gap between individual clocks |
+| `easing` | `'ease-in-out' \| 'linear'` | `'ease-in-out'` | Easing curve for hand transitions |
+| `rotation` | `'clockwise' \| 'shortest'` | `'clockwise'` | Direction hands rotate — `'clockwise'` always sweeps forward; `'shortest'` takes the shortest arc |
 | `className` | `string` | — | CSS class on the outer container |
-| `style` | `CSSProperties` | — | Inline styles merged onto the outer container |
-
-The outer container is a flexbox that centers the grid. Set `height` on the container (via `style` or parent) and the board background will fill the space, with the clock grid centered within. This prevents black bars when the parent aspect ratio doesn't match the grid.
+| `style` | `CSSProperties` | — | Inline styles on the outer container |
 
 ```tsx
-// Full-viewport board — no black bars, grid centered
+// Full-viewport board
 <ClockBoard style={{ height: '100vh' }} />
 
 // Fixed-size container
@@ -81,7 +67,7 @@ The outer container is a flexbox that centers the grid. Set `height` on the cont
 
 ## Behaviors
 
-Behaviors are functions that control what the board displays over time. They receive an `apply` callback to push patterns to the grid and return a cleanup function.
+Behaviors control what the board displays over time. They receive an `apply` callback to push patterns and return a cleanup function.
 
 ```ts
 type Behavior = (apply: ApplyPattern) => () => void
@@ -90,44 +76,43 @@ type ApplyPattern = (pattern: GridPattern, duration?: number) => void
 
 ### Built-in Behaviors
 
-**`clockRandom(patterns?, duration?, hold?, timeDuration?, timeHold?)`**
+**`clockRandom`**
 
-The default. Displays the current system time (24-hour format) at every minute boundary, then transitions through random ambient patterns between updates.
+The default. Cycles through random ambient patterns and displays the current system time (24-hour format) whenever the minute changes.
 
 ```tsx
 import { ClockBoard, clockRandom } from 'clockboard'
 
-// All defaults
 <ClockBoard />
-
-// Equivalent to:
+// equivalent to:
 <ClockBoard behavior={clockRandom()} />
 
-// Custom timing: faster ambient transitions, longer time display
-<ClockBoard behavior={clockRandom(undefined, 3000, 2000, 4000, 15000)} />
+// Custom options
+<ClockBoard behavior={clockRandom({ duration: 3000, hold: 2000, timeDuration: 4000, timeHold: 15000 })} />
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `patterns` | `GridPattern[]` | `ALL_PATTERNS` | Pool of ambient patterns to randomly pick from |
-| `duration` | `number` | `5000` | Ambient pattern transition duration (ms) |
-| `hold` | `number` | `5000` | Pause between ambient transitions (ms) |
+Accepts an options object or positional args `(patterns?, duration?, hold?, timeDuration?, timeHold?)`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `patterns` | `GridPattern[]` | `ALL_PATTERNS` | Pool of ambient patterns |
+| `duration` | `number` | `10000` | Ambient transition duration (ms) |
+| `hold` | `number` | `800` | Pause between ambient transitions (ms) |
 | `timeDuration` | `number` | `5000` | Time display transition duration (ms) |
 | `timeHold` | `number` | `10000` | How long the time stays visible before resuming ambient (ms) |
 
-**`clockCycle(patterns?, duration?, hold?, timeDuration?, timeHold?)`**
+**`clockCycle`**
 
-Same as `clockRandom` but cycles through ambient patterns in order instead of randomly.
+Same as `clockRandom` but steps through ambient patterns in order rather than randomly. Same signatures and defaults.
 
 ```tsx
 import { ClockBoard, clockCycle } from 'clockboard'
 
 <ClockBoard behavior={clockCycle()} />
+<ClockBoard behavior={clockCycle({ hold: 250 })} />
 ```
 
-Parameters are identical to `clockRandom`.
-
-**`clock(duration?)`**
+**`clock`**
 
 Pure time display. Shows the current system time and updates every minute. No ambient patterns.
 
@@ -135,16 +120,14 @@ Pure time display. Shows the current system time and updates every minute. No am
 import { ClockBoard, clock } from 'clockboard'
 
 <ClockBoard behavior={clock()} />
-
-// Faster transition when the minute changes
-<ClockBoard behavior={clock(2000)} />
+<ClockBoard behavior={clock({ duration: 2000 })} />
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `duration` | `number` | `5000` | Transition duration when the time updates (ms) |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `duration` | `number` | `10000` | Transition duration when the time updates (ms) |
 
-**`random(patterns?, duration?, hold?)`**
+**`random`**
 
 Continuously transitions through random ambient patterns. No time display.
 
@@ -152,29 +135,29 @@ Continuously transitions through random ambient patterns. No time display.
 import { ClockBoard, random } from 'clockboard'
 
 <ClockBoard behavior={random()} />
+<ClockBoard behavior={random({ hold: 250 })} />
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+Accepts an options object or positional args `(patterns?, duration?, hold?)`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
 | `patterns` | `GridPattern[]` | `ALL_PATTERNS` | Pool of patterns |
-| `duration` | `number` | `5000` | Transition duration (ms) |
-| `hold` | `number` | `5000` | Pause between transitions (ms) |
+| `duration` | `number` | `10000` | Transition duration (ms) |
+| `hold` | `number` | `800` | Pause after transition before next (ms) |
 
-**`cycle(patterns?, duration?, hold?)`**
+**`cycle`**
 
-Cycles through ambient patterns in order. No time display.
+Cycles through ambient patterns in order. No time display. Same signatures and defaults as `random`.
 
 ```tsx
 import { ClockBoard, cycle } from 'clockboard'
 
 <ClockBoard behavior={cycle()} />
+<ClockBoard behavior={cycle({ duration: 3000 })} />
 ```
 
-Parameters are identical to `random`.
-
 ### Custom Behaviors
-
-Write your own behavior by matching the `Behavior` signature:
 
 ```tsx
 import { ClockBoard, NOON, RADIAL } from 'clockboard'
@@ -193,20 +176,20 @@ const alternate: Behavior = (apply) => {
 <ClockBoard behavior={alternate} />
 ```
 
-The `apply` function accepts any `GridPattern` (an 8×20 array of `[hand1Angle, hand2Angle]` pairs) and an optional duration in milliseconds.
+The `apply` function accepts any `GridPattern` and an optional duration in milliseconds.
 
 ## Patterns
 
-A `GridPattern` is an 8-row × 20-column 2D array where each cell is a `ClockState` — a tuple of two angles in degrees (`[hand1, hand2]`), one per hand. `0°` is 12 o'clock, `90°` is 3 o'clock, `180°` is 6 o'clock, `270°` is 9 o'clock.
+A `GridPattern` is an 8-row × 20-column 2D array where each cell is a `ClockState` — a tuple of two angles in degrees (`[hand1, hand2]`). `0°` is 12 o'clock, `90°` is 3 o'clock, `180°` is 6 o'clock, `270°` is 9 o'clock.
 
 ### Built-in Ambient Patterns
 
-All 14 patterns are individually exported and also available as the `ALL_PATTERNS` array:
+All 13 patterns are individually exported and also available as the `ALL_PATTERNS` array:
 
 ```tsx
 import {
   NOON, RADIAL, CONVERGE, CHECKERBOARD, WAVE, VORTEX,
-  PINWHEEL, RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
+  RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
   BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL,
   ALL_PATTERNS,
   randomPattern, // generates a unique random pattern each call
@@ -221,7 +204,6 @@ import {
 | `CHECKERBOARD` | Alternating vertical and horizontal bars |
 | `WAVE` | Sine wave undulating across columns |
 | `VORTEX` | Radial direction twisted by distance — galaxy spiral |
-| `PINWHEEL` | Hands tangential to radial direction |
 | `RINGS` | Angle grows with distance from center — concentric rings |
 | `CONCENTRIC_RECTS` | Rectangular borders from edge to center |
 | `CROSS_STITCH` | Alternating X and + shapes — woven texture |
@@ -231,8 +213,6 @@ import {
 | `WINDMILL` | 2×2 repeating windmill — each cell rotated 90° from neighbors |
 
 ### Using the `pattern` Prop
-
-For static displays or manual control, use the `pattern` prop instead of a behavior:
 
 ```tsx
 import { useState } from 'react'
@@ -254,8 +234,6 @@ function App() {
 
 ### Time Composition
 
-Build a time pattern programmatically with `composeTime`:
-
 ```tsx
 import { ClockBoard, composeTime } from 'clockboard'
 
@@ -263,11 +241,9 @@ import { ClockBoard, composeTime } from 'clockboard'
 <ClockBoard pattern={composeTime(14, 30)} />
 ```
 
-`composeTime(hours, minutes)` returns a full `GridPattern` with the time rendered in the center 18×6 region using styled digits, a colon separator, and an idle border.
+`composeTime(hours, minutes)` returns a full `GridPattern` with the time rendered in the center 18×6 region.
 
 ### Custom Patterns
-
-Create your own `GridPattern` — an 8×20 array:
 
 ```tsx
 import type { GridPattern, ClockState } from 'clockboard'
@@ -284,7 +260,7 @@ const myPattern: GridPattern = Array.from({ length: 8 }, (_, row) =>
 
 ## Grid Dimensions
 
-The board is a fixed 20 columns × 8 rows (160 clocks). The clock grid maintains this aspect ratio regardless of the container size.
+The board is a fixed 20 columns × 8 rows (160 clocks).
 
 **Time layout within the grid:**
 - The outermost ring of clocks (border) stays in idle position (both hands at 225°)
@@ -295,7 +271,7 @@ The board is a fixed 20 columns × 8 rows (160 clocks). The clock grid maintains
 
 ## Multiple Instances
 
-Each `ClockBoard` is fully independent. Run multiple boards on the same page with different behaviors, patterns, and styles:
+Each `ClockBoard` is fully independent:
 
 ```tsx
 <ClockBoard behavior={clock()} boardColor="#1a1a2e" handColor="#e94560" />
@@ -304,8 +280,6 @@ Each `ClockBoard` is fully independent. Run multiple boards on the same page wit
 ```
 
 ## Types
-
-All types are exported for TypeScript consumers:
 
 ```tsx
 import type {
@@ -318,8 +292,6 @@ import type {
 ```
 
 ## Full-Screen Display
-
-To run ClockBoard as a standalone display on any screen, serve a single page:
 
 ```html
 <!DOCTYPE html>
@@ -338,7 +310,18 @@ To run ClockBoard as a standalone display on any screen, serve a single page:
 </html>
 ```
 
-Set the body background to match `boardColor` so the display is seamless edge to edge. Open the page in any full-screen browser.
+Set the body background to match `boardColor` so the display is seamless edge to edge.
+
+## Changelog
+
+### 0.1.0
+- Overhauled animation engine for reliable, uninterrupted transitions
+- Fixed animation timing when tab loses focus or window is backgrounded
+- Added gradient support for `boardColor`
+- Fixed resizing issues
+
+### 0.0.1
+- Initial release
 
 ## License
 

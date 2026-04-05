@@ -10,6 +10,8 @@ export interface ClockBoardProps {
   behavior?: Behavior
   pattern?: GridPattern
   duration?: number
+  easing?: 'ease-in-out' | 'linear'
+  rotation?: 'clockwise' | 'shortest'
 
   handColor?: string
   faceColor?: string
