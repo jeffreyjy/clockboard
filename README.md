@@ -1,6 +1,6 @@
 # ClockBoard
 
-A 20×8 grid of analog clocks that animate together to form patterns and display the time. Canvas-rendered React component — 60fps, zero CSS imports.
+A 20×8 grid of analog clocks that animate together to form patterns, spin, and display the time. Canvas-rendered React component — 60fps, zero CSS imports.
 
 ## Install
 
@@ -24,9 +24,9 @@ function App() {
 }
 ```
 
-The default behavior (`clockRandom`) cycles through randomized ambient patterns, displaying the current time whenever the minute changes.
+The default behavior (`aliveTime`) is a generative animation that cycles through moods — drifting between patterns, spinning, and periodically displaying the current time. Every viewing is different.
 
-The board fills its parent. The clock grid keeps a fixed 20×8 aspect ratio and scales uniformly to fit the padded area — constrained by whichever dimension is tighter.
+The board fills its parent. The clock grid keeps a fixed 20×8 aspect ratio and scales uniformly to fit — constrained by whichever dimension is tighter.
 
 ## Props
 
@@ -34,9 +34,9 @@ The board fills its parent. The clock grid keeps a fixed 20×8 aspect ratio and 
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `behavior` | `Behavior` | `clockRandom()` | Dynamic behavior controlling pattern transitions over time |
+| `behavior` | `Behavior` | `aliveTime()` | Controls what the board does over time |
 | `pattern` | `GridPattern` | — | Static pattern — sets all clocks to a fixed position (disables `behavior`) |
-| `duration` | `number` | `10000` | Transition duration in ms when using the `pattern` prop |
+| `duration` | `number` | `10000` | Transition duration in ms when using the `pattern` prop. Use `0` to snap instantly. |
 
 When `pattern` is set, it takes priority over `behavior`. The board animates to the given pattern once and holds. When `pattern` is cleared (set to `undefined`), the `behavior` resumes.
 
@@ -50,114 +50,246 @@ When `pattern` is set, it takes priority over `behavior`. The board animates to 
 | `boardPadding` | `string` | `'4%'` | Padding around the clock grid |
 | `boardRadius` | `number` | `8` | Border radius of the board in pixels |
 | `clockGap` | `string` | `'0.5%'` | Gap between individual clocks |
-| `easing` | `'ease-in-out' \| 'linear'` | `'ease-in-out'` | Easing curve for hand transitions |
+| `easing` | `'ease-in-out' \| 'linear' \| (t: number) => number` | `'ease-in-out'` | Default easing curve for transitions — `'ease-in-out'` is a trapezoidal profile (ramp up, constant speed cruise, ramp down). Pass a custom function mapping `[0,1] → [0,1]` for full control |
 | `rotation` | `'clockwise' \| 'shortest'` | `'clockwise'` | Direction hands rotate — `'clockwise'` always sweeps forward; `'shortest'` takes the shortest arc |
 | `className` | `string` | — | CSS class on the outer container |
 | `style` | `CSSProperties` | — | Inline styles on the outer container |
 
-```tsx
-// Full-viewport board
-<ClockBoard style={{ height: '100vh' }} />
+## How It Works
 
-// Fixed-size container
-<div style={{ width: 800, height: 400 }}>
-  <ClockBoard />
-</div>
-```
+ClockBoard's animation system has three layers:
+
+**Engine** — The canvas rendering loop. It receives commands via `apply(pattern, options)` and animates clock hands from their current positions to target positions. Supports per-action easing, per-clock stagger delays, and two animation modes (standard lerp and two-phase spin reveal).
+
+**Actions** — The operations you can tell the board to do. Each action is atomic — it runs to completion before the next one starts, enforced structurally via `onComplete` callbacks. Actions include:
+- **Transition** — move hands to a target pattern
+- **Spin** — uniform rotation (via `absolute: true` targets)
+- **Spin reveal** — uniform rotation that lands on a target pattern (via `spinRevolutions`)
+
+**Behaviors** — Programs that orchestrate actions over time. They receive an `apply` callback and return a cleanup function. Range from simple (`loop` a fixed sequence) to complex (the generative `alive` behavior with moods and randomness).
 
 ## Behaviors
 
-Behaviors control what the board displays over time. They receive an `apply` callback to push patterns and return a cleanup function.
-
-```ts
-type Behavior = (apply: ApplyPattern) => () => void
-type ApplyPattern = (pattern: GridPattern, duration?: number) => void
-```
-
 ### Built-in Behaviors
 
-**`clockRandom`**
-
-The default. Cycles through random ambient patterns and displays the current system time (24-hour format) whenever the minute changes.
+**`aliveTime`** — The default. A generative behavior that cycles through three moods (drift, spin, restless) with diverse transitions and stagger effects. Displays the current time whenever the minute changes. Every viewing is unique.
 
 ```tsx
-import { ClockBoard, clockRandom } from 'clockboard'
-
 <ClockBoard />
 // equivalent to:
-<ClockBoard behavior={clockRandom()} />
+<ClockBoard behavior={aliveTime()} />
+```
 
-// Custom options
+**`alive`** — Same as `aliveTime` but without time display. Pure generative animation.
+
+```tsx
+<ClockBoard behavior={alive()} />
+```
+
+**`concentricDance`** — Looping INWARD opposite spin with center-out stagger.
+
+```tsx
+<ClockBoard behavior={concentricDance()} />
+```
+
+**`gentleDrift`** — Slow ambient pattern transitions with random stagger, looping.
+
+```tsx
+<ClockBoard behavior={gentleDrift()} />
+```
+
+**`clockRandom`** — Cycles through random ambient patterns, displaying the time whenever the minute changes. The previous default.
+
+```tsx
+<ClockBoard behavior={clockRandom()} />
 <ClockBoard behavior={clockRandom({ duration: 3000, hold: 2000, timeDuration: 4000, timeHold: 15000 })} />
 ```
 
-Accepts an options object or positional args `(patterns?, duration?, hold?, timeDuration?, timeHold?)`.
+**`clockCycle`** — Same as `clockRandom` but steps through patterns in order.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `patterns` | `GridPattern[]` | `ALL_PATTERNS` | Pool of ambient patterns |
-| `duration` | `number` | `10000` | Ambient transition duration (ms) |
-| `hold` | `number` | `800` | Pause between ambient transitions (ms) |
-| `timeDuration` | `number` | `5000` | Time display transition duration (ms) |
-| `timeHold` | `number` | `10000` | How long the time stays visible before resuming ambient (ms) |
-
-**`clockCycle`**
-
-Same as `clockRandom` but steps through ambient patterns in order rather than randomly. Same signatures and defaults.
+**`clock`** — Pure time display. Shows the current system time and updates every minute.
 
 ```tsx
-import { ClockBoard, clockCycle } from 'clockboard'
-
-<ClockBoard behavior={clockCycle()} />
-<ClockBoard behavior={clockCycle({ hold: 250 })} />
-```
-
-**`clock`**
-
-Pure time display. Shows the current system time and updates every minute. No ambient patterns.
-
-```tsx
-import { ClockBoard, clock } from 'clockboard'
-
 <ClockBoard behavior={clock()} />
-<ClockBoard behavior={clock({ duration: 2000 })} />
 ```
+
+**`cycle`** — Cycles through ambient patterns in order. No time display.
+
+**`random`** — Random ambient pattern transitions. No time display.
+
+All built-in behaviors accept an optional `stagger` field in their options:
+
+```tsx
+<ClockBoard behavior={clockRandom({ stagger: stagger.centerOut(500) })} />
+<ClockBoard behavior={cycle({ stagger: stagger.leftToRight(600) })} />
+```
+
+### Composition: `sequence` and `loop`
+
+Build behaviors declaratively from steps:
+
+```tsx
+import { ClockBoard, loop, sequence, NOON, RADIAL, VORTEX } from 'clockboard'
+
+// Play once and stop
+<ClockBoard behavior={sequence([
+  { pattern: NOON, duration: 2000, hold: 500 },
+  { pattern: RADIAL, duration: 3000, hold: 1000 },
+  { pattern: VORTEX, duration: 3000 },
+])} />
+
+// Repeat forever
+<ClockBoard behavior={loop([
+  { pattern: RADIAL, duration: 3000, hold: 1000 },
+  { pattern: VORTEX, duration: 3000, hold: 1000 },
+])} />
+```
+
+**SequenceStep fields:**
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `duration` | `number` | `10000` | Transition duration when the time updates (ms) |
+| `pattern` | `GridPattern \| () => GridPattern` | *required* | Target pattern — or a function for dynamic patterns |
+| `duration` | `number` | `10000` | Transition duration (ms). Ignored when `spinRevolutions` is set. |
+| `hold` | `number` | `0` | Pause after this step before the next (ms) |
+| `easing` | `(t: number) => number` | default easing | Per-step easing override |
+| `absolute` | `boolean` | `false` | Use raw target angles — for multi-revolution spin |
+| `stagger` | `StaggerFn` | — | Per-clock animation delay |
+| `spinRevolutions` | `number` | — | Enables spin reveal mode (see below) |
+| `spinDirection` | `'clockwise' \| 'counterclockwise' \| 'opposite'` | `'clockwise'` | Spin direction |
+| `revolutionDuration` | `number` | `10000` | Duration of one revolution (ms) |
 
-**`random`**
+### Spin
 
-Continuously transitions through random ambient patterns. No time display.
+The `spin()` wrapper returns `SequenceStep[]` — spread it into `loop()` or `sequence()`:
 
 ```tsx
-import { ClockBoard, random } from 'clockboard'
+import { ClockBoard, loop, spin } from 'clockboard'
 
-<ClockBoard behavior={random()} />
-<ClockBoard behavior={random({ hold: 250 })} />
+// Default: 3 revolutions, 10s each, both hands clockwise
+<ClockBoard behavior={loop(spin())} />
 ```
 
-Accepts an options object or positional args `(patterns?, duration?, hold?)`.
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `start` | `GridPattern` | `uniformPattern(0, 180)` | Starting hand positions |
+| `revolutions` | `number` | `3` | Number of full rotations |
+| `opposite` | `boolean` | `false` | Hour hand spins opposite direction |
+| `revolutionDuration` | `number` | `10000` | Duration of one revolution (ms) |
+| `easing` | `(t: number) => number` | `trapezoid(0.10)` | Easing curve |
+| `stagger` | `StaggerFn` | — | Per-clock animation delay |
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `patterns` | `GridPattern[]` | `ALL_PATTERNS` | Pool of patterns |
-| `duration` | `number` | `10000` | Transition duration (ms) |
-| `hold` | `number` | `800` | Pause after transition before next (ms) |
-
-**`cycle`**
-
-Cycles through ambient patterns in order. No time display. Same signatures and defaults as `random`.
+**Spin presets** return `SequenceStep[]` with setup + spin, ready to compose:
 
 ```tsx
-import { ClockBoard, cycle } from 'clockboard'
+import { loop, concentricSpin, waveSpin } from 'clockboard'
 
-<ClockBoard behavior={cycle()} />
-<ClockBoard behavior={cycle({ duration: 3000 })} />
+<ClockBoard behavior={loop(concentricSpin())} />
+<ClockBoard behavior={loop(waveSpin())} />
+
+// Mix presets with other steps
+<ClockBoard behavior={loop([
+  ...concentricSpin(),
+  { pattern: RADIAL, duration: 3000, hold: 1000 },
+  ...waveSpin(),
+])} />
+```
+
+For full manual control, use `uniformPattern`, `rotateAll`, and `absolute: true`:
+
+```tsx
+const start = uniformPattern(0, 180)
+
+loop([
+  { pattern: start, duration: 0 },
+  { pattern: rotateAll(start, 1080, -720), duration: 12000, absolute: true },
+])
+```
+
+- `uniformPattern(minuteAngle, hourAngle)` — every clock set to the same hand positions
+- `rotateAll(pattern, minuteDegrees, hourDegrees?)` — offset all hands. Pass two values for independent control (e.g., minute clockwise, hour counterclockwise).
+
+### Spin Reveal
+
+Use `spinRevolutions` to create a spin-to-pattern reveal. Hands spin uniformly, then individually decelerate to land at the target pattern. The transition from spinning to landing is seamless — velocity-matched per-hand quadratic deceleration.
+
+```tsx
+import { ClockBoard, composeTime, stagger, uniformPattern } from 'clockboard'
+import type { Behavior } from 'clockboard'
+
+const start = uniformPattern(0, 180)
+const time = composeTime(14, 30)
+
+const reveal: Behavior = (apply) => {
+  apply(start, { duration: 3000, onComplete: () => {
+    apply(time, {
+      spinRevolutions: 2,
+      revolutionDuration: 5000,
+      stagger: stagger.leftToRight(2000),
+    })
+  }})
+  return () => {}
+}
+```
+
+Or declaratively with `sequence`:
+
+```tsx
+import { sequence, composeTime, uniformPattern, stagger } from 'clockboard'
+
+const time = composeTime(14, 30)
+
+const reveal = sequence([
+  { pattern: uniformPattern(0, 180), duration: 3000 },
+  { pattern: time, spinRevolutions: 2, revolutionDuration: 5000, stagger: stagger.leftToRight(2000) },
+])
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `spinRevolutions` | `number` | — | Number of uniform cruise revolutions before landing |
+| `spinDirection` | `'clockwise' \| 'counterclockwise' \| 'opposite'` | `'clockwise'` | Spin direction. `'opposite'` makes minute CW and hour CCW. |
+| `revolutionDuration` | `number` | `10000` | Duration of one revolution (ms). Total duration is auto-computed. |
+| `stagger` | `StaggerFn` | — | Per-clock animation delay |
+
+When `spinRevolutions` is set, `easing`, `absolute`, and `duration` are ignored — the engine manages timing and easing internally.
+
+### Stagger
+
+Stagger offsets the start time of each clock's animation, creating wave-like effects:
+
+```tsx
+import { ClockBoard, loop, spin, stagger } from 'clockboard'
+
+<ClockBoard behavior={loop(spin({ stagger: stagger.leftToRight(2000) }))} />
+```
+
+The total action time becomes `duration + maxDelay`. `onComplete` fires when the last clock finishes.
+
+**Built-in stagger functions:**
+
+| Function | Effect |
+|----------|--------|
+| `stagger.leftToRight(maxDelay)` | Left edge starts first |
+| `stagger.rightToLeft(maxDelay)` | Right edge starts first |
+| `stagger.topToBottom(maxDelay)` | Top row starts first |
+| `stagger.bottomToTop(maxDelay)` | Bottom row starts first |
+| `stagger.centerOut(maxDelay)` | Center clocks start first |
+| `stagger.edgesIn(maxDelay)` | Edge clocks start first |
+| `stagger.randomStagger(maxDelay)` | Random delay per clock |
+
+Custom stagger functions receive `(row, col)` and return delay in ms:
+
+```tsx
+import type { StaggerFn } from 'clockboard'
+
+const checkerStagger: StaggerFn = (row, col) =>
+  (row + col) % 2 === 0 ? 0 : 400
 ```
 
 ### Custom Behaviors
+
+For complex logic (time-awareness, randomness, conditional branching), write a behavior function directly:
 
 ```tsx
 import { ClockBoard, NOON, RADIAL } from 'clockboard'
@@ -165,97 +297,134 @@ import type { Behavior } from 'clockboard'
 
 const alternate: Behavior = (apply) => {
   let flip = false
-  const interval = setInterval(() => {
-    apply(flip ? NOON : RADIAL, 3000)
-    flip = !flip
-  }, 8000)
-  apply(NOON, 3000)
-  return () => clearInterval(interval)
-}
+  let timer: ReturnType<typeof setTimeout>
 
-<ClockBoard behavior={alternate} />
+  function step() {
+    apply(flip ? NOON : RADIAL, {
+      duration: 3000,
+      onComplete: () => { timer = setTimeout(step, 2000) },
+    })
+    flip = !flip
+  }
+
+  step()
+  return () => clearTimeout(timer)
+}
 ```
 
-The `apply` function accepts any `GridPattern` and an optional duration in milliseconds.
+Use `onComplete` to chain actions — the engine calls it when the animation finishes, so timing is exact even across tab switches.
+
+**`ApplyPattern` signature:**
+
+```ts
+type ApplyPattern = (pattern: GridPattern, durationOrOptions?: number | ApplyOptions) => void
+```
+
+**`ApplyOptions`:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `duration` | `number` | `10000` | Transition duration (ms) |
+| `easing` | `(t: number) => number` | default easing | Easing curve |
+| `absolute` | `boolean` | `false` | Raw target angles (for multi-revolution spin) |
+| `onComplete` | `() => void` | — | Called when the action finishes |
+| `stagger` | `StaggerFn` | — | Per-clock delay |
+| `spinRevolutions` | `number` | — | Enables spin reveal mode |
+| `spinDirection` | `'clockwise' \| 'counterclockwise' \| 'opposite'` | `'clockwise'` | Spin direction |
+| `revolutionDuration` | `number` | `10000` | Duration of one revolution |
 
 ## Patterns
 
 A `GridPattern` is an 8-row × 20-column 2D array where each cell is a `ClockState` — a tuple of two angles in degrees (`[hand1, hand2]`). `0°` is 12 o'clock, `90°` is 3 o'clock, `180°` is 6 o'clock, `270°` is 9 o'clock.
 
-### Built-in Ambient Patterns
+### Built-in Patterns
 
-All 13 patterns are individually exported and also available as the `ALL_PATTERNS` array:
+All 14 patterns are individually exported and available as the `ALL_PATTERNS` array:
 
 ```tsx
 import {
   NOON, RADIAL, CONVERGE, CHECKERBOARD, WAVE, VORTEX,
   RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
-  BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL,
+  BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL, INWARD,
   ALL_PATTERNS,
-  randomPattern, // generates a unique random pattern each call
+  randomPattern,
 } from 'clockboard'
 ```
 
 | Pattern | Description |
 |---------|-------------|
-| `NOON` | All hands at 12 o'clock — clean reset |
-| `RADIAL` | Hands radiate outward from grid center — starburst |
-| `CONVERGE` | All hands point inward toward center — vortex sink |
+| `NOON` | All hands at 12 o'clock |
+| `RADIAL` | Hands radiate outward from grid center |
+| `CONVERGE` | All hands point inward toward center |
 | `CHECKERBOARD` | Alternating vertical and horizontal bars |
 | `WAVE` | Sine wave undulating across columns |
-| `VORTEX` | Radial direction twisted by distance — galaxy spiral |
-| `RINGS` | Angle grows with distance from center — concentric rings |
+| `VORTEX` | Radial direction twisted by distance |
+| `RINGS` | Concentric rings from center |
 | `CONCENTRIC_RECTS` | Rectangular borders from edge to center |
-| `CROSS_STITCH` | Alternating X and + shapes — woven texture |
-| `BLOOM` | Hands splay wider with distance — flower opening |
+| `CROSS_STITCH` | Alternating X and + shapes |
+| `BLOOM` | Hands splay wider with distance from center |
 | `CHEVRONS` | Rows of V-shapes alternating direction |
-| `SPIRAL_ARMS` | Twisted V-shapes following a spiral curve |
-| `WINDMILL` | 2×2 repeating windmill — each cell rotated 90° from neighbors |
+| `SPIRAL_ARMS` | Twisted V-shapes following a spiral |
+| `WINDMILL` | 2×2 repeating windmill |
+| `INWARD` | Both hands pointing toward grid center, stacked |
+| `randomPattern()` | Unique random angles each call |
 
-### Using the `pattern` Prop
-
-```tsx
-import { useState } from 'react'
-import { ClockBoard, RADIAL, VORTEX, NOON } from 'clockboard'
-
-function App() {
-  const [pattern, setPattern] = useState(RADIAL)
-
-  return (
-    <>
-      <ClockBoard pattern={pattern} duration={3000} />
-      <button onClick={() => setPattern(RADIAL)}>Radial</button>
-      <button onClick={() => setPattern(VORTEX)}>Vortex</button>
-      <button onClick={() => setPattern(NOON)}>Reset</button>
-    </>
-  )
-}
-```
+`SYMMETRIC_STARTS` is a curated list of patterns suitable as spin starting positions: `NOON`, vertical line, horizontal line, and `INWARD`.
 
 ### Time Composition
 
 ```tsx
 import { ClockBoard, composeTime } from 'clockboard'
 
-// Static display of 14:30
 <ClockBoard pattern={composeTime(14, 30)} />
 ```
 
-`composeTime(hours, minutes)` returns a full `GridPattern` with the time rendered in the center 18×6 region.
-
 ### Custom Patterns
 
+The `grid` helper creates a `GridPattern` from a function called for each clock position. `CENTER_COL` and `CENTER_ROW` provide the grid center coordinates.
+
 ```tsx
-import type { GridPattern, ClockState } from 'clockboard'
+import { grid, CENTER_COL, CENTER_ROW } from 'clockboard'
 
-const myPattern: GridPattern = Array.from({ length: 8 }, (_, row) =>
-  Array.from({ length: 20 }, (_, col): ClockState => {
-    const angle = (row * 20 + col) * (360 / 160)
-    return [angle, angle + 180]
-  })
-)
+const converge = grid((row, col) => {
+  const angle = Math.atan2(CENTER_COL - col, row - CENTER_ROW) * (180 / Math.PI)
+  return [angle, angle]
+})
 
-<ClockBoard pattern={myPattern} />
+<ClockBoard pattern={converge} duration={0} />
+```
+
+| Export | Value | Description |
+|--------|-------|-------------|
+| `COLS` | `20` | Grid columns |
+| `ROWS` | `8` | Grid rows |
+| `CENTER_COL` | `9.5` | Horizontal center of the grid |
+| `CENTER_ROW` | `3.5` | Vertical center of the grid |
+
+### Easing
+
+The default easing is a trapezoidal profile — ramp up, constant speed cruise, ramp down. Use `trapezoid(edge)` to create custom profiles where `edge` is the fraction of time spent in each ramp (0–0.5):
+
+```tsx
+import { trapezoid } from 'clockboard'
+
+trapezoid(0.30) // 30% ramp, 40% cruise (default)
+trapezoid(0.10) // 10% ramp, 80% cruise (spin default)
+trapezoid(0.05) // 5% ramp, 90% cruise (near-linear)
+```
+
+### Random Utilities
+
+Helpers for building custom generative behaviors:
+
+```tsx
+import { pick, pickExcept, weightedPick, randInt, randFloat } from 'clockboard'
+
+pick([1, 2, 3])              // random item
+pickExcept([1, 2, 3], 2)     // random item, not 2
+weightedPick(['a', 'b'], [0.7, 0.3])  // weighted random
+randInt(1, 10)               // integer in [1, 10]
+randFloat(0, 1)              // float in [0, 1)
 ```
 
 ## Grid Dimensions
@@ -275,7 +444,7 @@ Each `ClockBoard` is fully independent:
 
 ```tsx
 <ClockBoard behavior={clock()} boardColor="#1a1a2e" handColor="#e94560" />
-<ClockBoard behavior={random()} boardColor="#0f3460" handColor="#16213e" />
+<ClockBoard behavior={alive()} boardColor="#0f3460" handColor="#16213e" />
 <ClockBoard pattern={RADIAL} boardColor="#222" faceColor="#333" />
 ```
 
@@ -285,8 +454,12 @@ Each `ClockBoard` is fully independent:
 import type {
   ClockState,      // [hand1: number, hand2: number]
   GridPattern,     // ClockState[][] (8 rows × 20 cols)
-  ApplyPattern,    // (pattern: GridPattern, duration?: number) => void
+  ApplyOptions,    // { duration?, easing?, absolute?, onComplete?, stagger?, spinRevolutions?, spinDirection?, revolutionDuration? }
+  ApplyPattern,    // (pattern: GridPattern, durationOrOptions?: number | ApplyOptions) => void
   Behavior,        // (apply: ApplyPattern) => () => void
+  SequenceStep,    // { pattern, duration?, hold?, easing?, absolute?, stagger?, spinRevolutions?, spinDirection?, revolutionDuration? }
+  SpinOptions,     // { start?, revolutions?, opposite?, revolutionDuration?, easing?, stagger? }
+  StaggerFn,       // (row: number, col: number) => number
   ClockBoardProps,
 } from 'clockboard'
 ```
@@ -313,6 +486,15 @@ import type {
 Set the body background to match `boardColor` so the display is seamless edge to edge.
 
 ## Changelog
+
+### 1.0.0
+- Complete animation engine overhaul
+- New default behavior: `aliveTime()` — generative moods with reactive time display
+- Spin animations with per-clock stagger and spin reveal transitions
+- `sequence()` / `loop()` compositors for declarative behavior building
+- Preset behaviors: `concentricDance()`, `gentleDrift()`, `waveSpin()`, `concentricSpin()`
+- 14 built-in patterns including `INWARD`
+- Trapezoidal easing, custom easing support, per-action easing overrides
 
 ### 0.1.0
 - Overhauled animation engine for reliable, uninterrupted transitions

@@ -1,6 +1,6 @@
 {
   "name": "clockboard",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "An array of analog clocks that move together to form patterns and display the time. Canvas-rendered React component, 60fps.",
   "author": "Jeffrey Yang",

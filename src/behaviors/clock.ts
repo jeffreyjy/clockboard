@@ -4,7 +4,7 @@ import { composeTime } from '../patterns/time'
 import type { CycleRandomOptions } from './cycle'
 import type { Behavior, GridPattern } from '../types'
 
-const TIME_DURATION = 5000
+const TIME_DURATION = DEFAULT_DURATION
 const TIME_HOLD = 10000
 
 /** Optional overrides for `clock` — omit keys for defaults. */
@@ -28,6 +28,7 @@ function resolveClockShowcaseArgs(
   hold: number
   timeDuration: number
   timeHold: number
+  stagger?: (row: number, col: number) => number
 } {
   if (first !== undefined && !Array.isArray(first)) {
     const o = first
@@ -37,6 +38,7 @@ function resolveClockShowcaseArgs(
       hold: o.hold ?? CYCLE_HOLD,
       timeDuration: o.timeDuration ?? TIME_DURATION,
       timeHold: o.timeHold ?? TIME_HOLD,
+      stagger: o.stagger,
     }
   }
   return {
@@ -54,28 +56,25 @@ export function clock(durationOrOptions?: number | ClockOptions): Behavior {
       ? durationOrOptions
       : (durationOrOptions?.duration ?? DEFAULT_DURATION)
   return (apply) => {
+    let timer: ReturnType<typeof setTimeout>
+    let cancelled = false
+
     function show() {
+      if (cancelled) return
       const now = new Date()
-      apply(composeTime(now.getHours(), now.getMinutes()), duration)
+      apply(composeTime(now.getHours(), now.getMinutes()), {
+        duration,
+        onComplete: () => {
+          if (cancelled) return
+          const n = new Date()
+          const msUntilNextMinute = (60 - n.getSeconds()) * 1000 - n.getMilliseconds()
+          timer = setTimeout(show, msUntilNextMinute)
+        },
+      })
     }
 
     show()
-
-    const now = new Date()
-    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
-
-    let timer: ReturnType<typeof setTimeout>
-    let interval: ReturnType<typeof setInterval>
-
-    timer = setTimeout(() => {
-      show()
-      interval = setInterval(show, 60_000)
-    }, msUntilNextMinute)
-
-    return () => {
-      clearTimeout(timer)
-      clearInterval(interval)
-    }
+    return () => { cancelled = true; clearTimeout(timer) }
   }
 }
 
@@ -87,6 +86,7 @@ function showcase(
   hold: number,
   timeDuration: number,
   timeHold: number,
+  stagger?: (row: number, col: number) => number,
 ): Behavior {
   return (apply) => {
     let timer: ReturnType<typeof setTimeout>
@@ -99,11 +99,17 @@ function showcase(
       const currentMinute = now.getMinutes()
       if (currentMinute !== lastMinute) {
         lastMinute = currentMinute
-        apply(composeTime(now.getHours(), now.getMinutes()), timeDuration)
-        timer = setTimeout(step, timeDuration + timeHold)
+        apply(composeTime(now.getHours(), now.getMinutes()), {
+          duration: timeDuration,
+          stagger,
+          onComplete: () => { timer = setTimeout(step, timeHold) },
+        })
       } else {
-        apply(getNextPattern(), duration)
-        timer = setTimeout(step, duration + hold)
+        apply(getNextPattern(), {
+          duration,
+          stagger,
+          onComplete: () => { timer = setTimeout(step, hold) },
+        })
       }
     }
 
@@ -134,7 +140,7 @@ export function clockRandom(
     return a.patterns[current]
   }
 
-  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold)
+  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold, a.stagger)
 }
 
 export function clockCycle(
@@ -153,5 +159,5 @@ export function clockCycle(
     return p
   }
 
-  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold)
+  return showcase(getNext, a.duration, a.hold, a.timeDuration, a.timeHold, a.stagger)
 }

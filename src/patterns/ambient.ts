@@ -4,7 +4,7 @@ import type { ClockState, GridPattern } from '../types'
 const CX = (COLS - 1) / 2  // 9.5 — grid center column
 const CY = (ROWS - 1) / 2  // 3.5 — grid center row
 
-function grid(fn: (row: number, col: number) => ClockState): GridPattern {
+export function grid(fn: (row: number, col: number) => ClockState): GridPattern {
   return Array.from({ length: ROWS }, (_, r) =>
     Array.from({ length: COLS }, (_, c) => fn(r, c))
   )
@@ -107,8 +107,14 @@ export const WINDMILL: GridPattern = grid((r, c) => {
   return [base, base + 60]
 })
 
+/** Both hands pointing toward grid center — stacked at the same angle */
+export const INWARD: GridPattern = grid((r, c) => {
+  const angle = Math.atan2(CX - c, r - CY) * (180 / Math.PI)
+  return [angle, angle]
+})
+
 export const ALL_PATTERNS: GridPattern[] = [
   NOON, RADIAL, CONVERGE, CHECKERBOARD, WAVE, VORTEX,
   RINGS, CONCENTRIC_RECTS, CROSS_STITCH,
-  BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL,
+  BLOOM, CHEVRONS, SPIRAL_ARMS, WINDMILL, INWARD,
 ]

@@ -2,6 +2,8 @@
 // DO NOT CHANGE — all digit patterns, behaviors, and layout math are hardcoded for 20×8.
 export const COLS = 20
 export const ROWS = 8
+export const CENTER_COL = (COLS - 1) / 2  // 9.5
+export const CENTER_ROW = (ROWS - 1) / 2  // 3.5
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 export const BOARD_COLOR = '#171717'
@@ -20,5 +22,4 @@ export const FACE_RADIUS = 50          // fixed: half of 100×100 viewBox
 
 // ─── Animation ───────────────────────────────────────────────────────────────
 export const DEFAULT_DURATION = 10000  // ms; overridable per applyPattern() call
-export const ANIMATION_EASING = 'ease-in-out'
 export const CYCLE_HOLD       = 800    // ms pause after animation ends before next pattern

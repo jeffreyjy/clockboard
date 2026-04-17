@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ClockBoardProps } from './types'
 import { useCanvasBoard } from './useCanvasBoard'
-import { clockRandom } from './behaviors/clock'
+import { aliveTime } from './behaviors/alive'
 import { easeInOut } from './utils/easing'
 import { BOARD_COLOR, BOARD_PADDING, BOARD_RADIUS, CLOCK_FACE_INSET, CLOCK_GAP, COLS, DEFAULT_DURATION, HAND_COLOR, CLOCK_COLOR, ROWS } from './config'
 
-const DEFAULT_BEHAVIOR = clockRandom()
+const DEFAULT_BEHAVIOR = aliveTime()
 
 /** Width ÷ height for square cells (ignores small % gaps — close enough for fit). */
 const GRID_ASPECT = COLS / ROWS
@@ -76,7 +76,11 @@ export function ClockBoard({
 
   // Sync easing function whenever the prop changes
   useEffect(() => {
-    updateEasing(easing === 'linear' ? (t: number) => t : easeInOut)
+    updateEasing(
+      typeof easing === 'function' ? easing
+        : easing === 'linear' ? (t: number) => t
+        : easeInOut
+    )
   }, [easing, updateEasing])
 
   // Sync rotation mode whenever the prop changes
